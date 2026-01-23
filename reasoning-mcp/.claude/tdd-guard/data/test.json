@@ -1,0 +1,164 @@
+{
+  "testModules": [
+    {
+      "moduleId": "Projects/reasoning-mcp/tests/test_integration.py",
+      "tests": [
+        {
+          "name": "test_full_ensemble_workflow",
+          "fullName": "Projects/reasoning-mcp/tests/test_integration.py::test_full_ensemble_workflow",
+          "state": "passed"
+        },
+        {
+          "name": "test_workflow_with_multiple_invocations_per_agent",
+          "fullName": "Projects/reasoning-mcp/tests/test_integration.py::test_workflow_with_multiple_invocations_per_agent",
+          "state": "passed"
+        },
+        {
+          "name": "test_invoke_blocked_after_synthesize",
+          "fullName": "Projects/reasoning-mcp/tests/test_integration.py::test_invoke_blocked_after_synthesize",
+          "state": "passed"
+        },
+        {
+          "name": "test_perturb_blocked_after_synthesize",
+          "fullName": "Projects/reasoning-mcp/tests/test_integration.py::test_perturb_blocked_after_synthesize",
+          "state": "passed"
+        }
+      ]
+    },
+    {
+      "moduleId": "Projects/reasoning-mcp/tests/test_server.py",
+      "tests": [
+        {
+          "name": "test_ensemble_returns_prompt_without_agents",
+          "fullName": "Projects/reasoning-mcp/tests/test_server.py::test_ensemble_returns_prompt_without_agents",
+          "state": "passed"
+        },
+        {
+          "name": "test_ensemble_creates_session_with_agents",
+          "fullName": "Projects/reasoning-mcp/tests/test_server.py::test_ensemble_creates_session_with_agents",
+          "state": "passed"
+        },
+        {
+          "name": "test_ensemble_rejects_too_few_agents",
+          "fullName": "Projects/reasoning-mcp/tests/test_server.py::test_ensemble_rejects_too_few_agents",
+          "state": "passed"
+        },
+        {
+          "name": "test_ensemble_rejects_missing_chaos_agent",
+          "fullName": "Projects/reasoning-mcp/tests/test_server.py::test_ensemble_rejects_missing_chaos_agent",
+          "state": "passed"
+        },
+        {
+          "name": "test_ensemble_allows_no_chaos_when_disabled",
+          "fullName": "Projects/reasoning-mcp/tests/test_server.py::test_ensemble_allows_no_chaos_when_disabled",
+          "state": "passed"
+        },
+        {
+          "name": "test_ensemble_accepts_native_dict",
+          "fullName": "Projects/reasoning-mcp/tests/test_server.py::test_ensemble_accepts_native_dict",
+          "state": "passed"
+        },
+        {
+          "name": "test_ensemble_accepts_native_list",
+          "fullName": "Projects/reasoning-mcp/tests/test_server.py::test_ensemble_accepts_native_list",
+          "state": "passed"
+        },
+        {
+          "name": "test_invoke_returns_prompt_without_response",
+          "fullName": "Projects/reasoning-mcp/tests/test_server.py::test_invoke_returns_prompt_without_response",
+          "state": "passed"
+        },
+        {
+          "name": "test_invoke_registers_response",
+          "fullName": "Projects/reasoning-mcp/tests/test_server.py::test_invoke_registers_response",
+          "state": "passed"
+        },
+        {
+          "name": "test_invoke_accepts_native_dict",
+          "fullName": "Projects/reasoning-mcp/tests/test_server.py::test_invoke_accepts_native_dict",
+          "state": "passed"
+        },
+        {
+          "name": "test_invoke_rejects_unknown_agent",
+          "fullName": "Projects/reasoning-mcp/tests/test_server.py::test_invoke_rejects_unknown_agent",
+          "state": "passed"
+        },
+        {
+          "name": "test_invoke_tracks_unique_agents",
+          "fullName": "Projects/reasoning-mcp/tests/test_server.py::test_invoke_tracks_unique_agents",
+          "state": "passed"
+        },
+        {
+          "name": "test_invoke_session_not_found",
+          "fullName": "Projects/reasoning-mcp/tests/test_server.py::test_invoke_session_not_found",
+          "state": "passed"
+        },
+        {
+          "name": "test_perturb_returns_prompt_without_result",
+          "fullName": "Projects/reasoning-mcp/tests/test_server.py::test_perturb_returns_prompt_without_result",
+          "state": "passed"
+        },
+        {
+          "name": "test_perturb_registers_result",
+          "fullName": "Projects/reasoning-mcp/tests/test_server.py::test_perturb_registers_result",
+          "state": "passed"
+        },
+        {
+          "name": "test_perturb_validates_impact",
+          "fullName": "Projects/reasoning-mcp/tests/test_server.py::test_perturb_validates_impact",
+          "state": "passed"
+        },
+        {
+          "name": "test_synthesize_blocked_until_min_agents",
+          "fullName": "Projects/reasoning-mcp/tests/test_server.py::test_synthesize_blocked_until_min_agents",
+          "state": "passed"
+        },
+        {
+          "name": "test_synthesize_returns_prompt_when_ready",
+          "fullName": "Projects/reasoning-mcp/tests/test_server.py::test_synthesize_returns_prompt_when_ready",
+          "state": "passed"
+        },
+        {
+          "name": "test_synthesize_completes_session",
+          "fullName": "Projects/reasoning-mcp/tests/test_server.py::test_synthesize_completes_session",
+          "state": "passed"
+        },
+        {
+          "name": "test_synthesize_blocks_after_completion",
+          "fullName": "Projects/reasoning-mcp/tests/test_server.py::test_synthesize_blocks_after_completion",
+          "state": "passed"
+        },
+        {
+          "name": "test_get_session_state",
+          "fullName": "Projects/reasoning-mcp/tests/test_server.py::test_get_session_state",
+          "state": "passed"
+        },
+        {
+          "name": "test_get_session_state_not_found",
+          "fullName": "Projects/reasoning-mcp/tests/test_server.py::test_get_session_state_not_found",
+          "state": "passed"
+        },
+        {
+          "name": "test_ensemble_rejects_missing_orchestrator",
+          "fullName": "Projects/reasoning-mcp/tests/test_server.py::test_ensemble_rejects_missing_orchestrator",
+          "state": "passed"
+        },
+        {
+          "name": "test_ensemble_allows_no_orchestrator_when_disabled",
+          "fullName": "Projects/reasoning-mcp/tests/test_server.py::test_ensemble_allows_no_orchestrator_when_disabled",
+          "state": "passed"
+        },
+        {
+          "name": "test_orchestrator_gets_special_prompt",
+          "fullName": "Projects/reasoning-mcp/tests/test_server.py::test_orchestrator_gets_special_prompt",
+          "state": "passed"
+        },
+        {
+          "name": "test_orchestrator_prompt_includes_context",
+          "fullName": "Projects/reasoning-mcp/tests/test_server.py::test_orchestrator_prompt_includes_context",
+          "state": "passed"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "reviewer": "decomposition_auditor",
+  "task_count": 4,
+  "meta_analysis": {
+    "decomposition_source": "compose-thinking planning skill, evidenced by plan structure",
+    "epic_complexity": "Medium - greenfield MCP server with ~4 source files, 19 tactics registry",
+    "task_count_smell": "4 tasks for MCP server is appropriate",
+    "audit_bias": "Watched for momentum bias on greenfield project",
+    "worker_impact": "Blockers would cause worker to hit missing branches field mid-implementation"
+  },
+  "findings": {
+    "blockers": [
+      {
+        "category": "coverage",
+        "spec": "task-1-scaffold-core-spec.md",
+        "issue": "Session.branches field missing from all task specs",
+        "evidence": "Plan line 137 defines `branches: dict[str, list[int]]` but Task 1 spec lines 39-41 omit it. BRANCH_EXPLORE tactic (Task 3 line 48) requires this field but no task adds it.",
+        "fix": "Add `branches: dict[str, list[int]] = field(default_factory=dict)` to Session in Task 1 spec lines 39-41",
+        "why_blocking": "Worker implementing BRANCH_EXPLORE in Task 3 will discover Session lacks the required field, causing mid-task design change"
+      }
+    ],
+    "improvements": [
+      {
+        "category": "sizing",
+        "spec": "task-2-relations-spec.md",
+        "recommendation": "Task 2 is undersized (only adds 2 optional params with validation). Consider merging into Task 1 (relations are core to thought chaining) or Task 3 (relations + tactics both extend think tool). Current split creates a thin PR with minimal standalone value."
+      },
+      {
+        "category": "interface",
+        "spec": "task-1-scaffold-core-spec.md:52-55 vs task-4-verify-spec.md:70-77",
+        "recommendation": "Task 1 creates __main__.py with inline mcp.run(), Task 4 rewrites it with main() wrapper for entry point. Use final pattern in Task 1 to avoid redundant work."
+      },
+      {
+        "category": "interface",
+        "spec": "all task specs",
+        "recommendation": "Return schema evolves across tasks (Task 1: thought_number/session_id/next_needed, Task 2 adds relation/targets, Task 3 adds tactic/guidance/expected_outputs). Make evolution explicit in each spec's Context section so workers know they're extending, not replacing."
+      },
+      {
+        "category": "risk",
+        "spec": "task-3-tactics-spec.md:44",
+        "recommendation": "Task 3 says 'Add all 19 tactics (from plan lines 102-122)' but META_ANALYSIS has style 'special' while others are divergent/sequential/adversarial/checkpoint. Clarify that style is metadata, not a functional concern - no special handling needed."
+      }
+    ]
+  },
+  "checkpoint": {
+    "code_explored": true,
+    "apis_verified": true,
+    "interfaces_checked": true,
+    "evidence_for_blockers": true,
+    "decomposition_quality": "Has Gaps",
+    "blocker_count": 1,
+    "confidence": "High - verified FastMCP API against reference/python_mcp_server.md, checked Session definition in plan vs specs, confirmed branches field is never added",
+    "flips_if": "If branches field is added to Task 1 Session definition, decomposition becomes Sound"
+  },
+  "summary": "Decomposition is sound except for one blocker: Session.branches field is in the plan but absent from all task specs, which will break BRANCH_EXPLORE tactic implementation. Task 2 is undersized and could merge with Task 1 or 3. Entry point pattern in Task 1 should match Task 4's final version."
+}
