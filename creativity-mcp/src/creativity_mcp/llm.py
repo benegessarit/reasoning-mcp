@@ -7,29 +7,45 @@ import os
 import httpx
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 
 FLASH_MODEL = "google/gemini-2.0-flash-001"
 SONNET_MODEL = "anthropic/claude-sonnet-4-20250514"
 
+_client: httpx.AsyncClient | None = None
+
+
+def _get_api_key() -> str:
+    key = os.environ.get("OPENROUTER_API_KEY", "")
+    if not key:
+        raise RuntimeError("OPENROUTER_API_KEY not set")
+    return key
+
+
+async def _get_client() -> httpx.AsyncClient:
+    global _client
+    if _client is None or _client.is_closed:
+        _client = httpx.AsyncClient(timeout=30.0)
+    return _client
+
 
 async def acall(model: str, prompt: str, temperature: float = 1.0) -> str:
     """Single async OpenRouter call with 1 retry."""
+    api_key = _get_api_key()
+    client = await _get_client()
     last_exc = None
     for attempt in range(2):
         try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    OPENROUTER_URL,
-                    headers={"Authorization": f"Bearer {OPENROUTER_API_KEY}"},
-                    json={
-                        "model": model,
-                        "temperature": temperature,
-                        "messages": [{"role": "user", "content": prompt}],
-                    },
-                )
-                response.raise_for_status()
-                return response.json()["choices"][0]["message"]["content"]
+            response = await client.post(
+                OPENROUTER_URL,
+                headers={"Authorization": f"Bearer {api_key}"},
+                json={
+                    "model": model,
+                    "temperature": temperature,
+                    "messages": [{"role": "user", "content": prompt}],
+                },
+            )
+            response.raise_for_status()
+            return response.json()["choices"][0]["message"]["content"]
         except Exception as exc:
             last_exc = exc
             if attempt == 0:
