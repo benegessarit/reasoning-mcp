@@ -158,13 +158,3 @@ Return JSON:
 
 "acceptable" requires genuine exhaustion of the space, not fatigue."""
 
-HARVEST_SUMMARY_PROMPT = """Collect and summarize the viable branches from this exploration.
-
-CHALLENGE: {challenge}
-
-BRANCHES:
-{branches}
-
-Group related branches. Present ALL viable directions without picking a winner or combining them. The caller decides what to do with these.
-
-Return a grouped summary of the exploration results."""

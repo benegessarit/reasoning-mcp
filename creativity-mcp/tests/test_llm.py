@@ -134,3 +134,43 @@ def test_get_api_key_raises_when_missing():
     with patch.dict("os.environ", {"OPENROUTER_API_KEY": ""}):
         with pytest.raises(RuntimeError, match="OPENROUTER_API_KEY not set"):
             llm_mod._get_api_key()
+
+
+@pytest.mark.anyio
+async def test_acall_non_retryable_raises_immediately():
+    """acall raises immediately on 401/403 without retrying."""
+    client = AsyncMock()
+    client.is_closed = False
+    resp_mock = MagicMock()
+    resp_mock.status_code = 401
+    client.post.side_effect = httpx.HTTPStatusError(
+        "401", request=MagicMock(), response=resp_mock,
+    )
+
+    with patch.object(llm_mod, "_get_client", new_callable=AsyncMock, return_value=client), \
+         patch.object(llm_mod, "_get_api_key", return_value="test-key"):
+        with pytest.raises(httpx.HTTPStatusError):
+            await llm_mod.acall("model", "prompt")
+    # Only one attempt — no retry on 401
+    assert client.post.call_count == 1
+
+
+@pytest.mark.anyio
+async def test_close_client():
+    """close_client shuts down the shared client."""
+    client = AsyncMock()
+    client.is_closed = False
+    llm_mod._client = client
+
+    await llm_mod.close_client()
+
+    client.aclose.assert_awaited_once()
+    assert llm_mod._client is None
+
+
+@pytest.mark.anyio
+async def test_close_client_noop_when_none():
+    """close_client is safe to call when no client exists."""
+    llm_mod._client = None
+    await llm_mod.close_client()  # Should not raise
+    assert llm_mod._client is None

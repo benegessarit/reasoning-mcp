@@ -1,4 +1,7 @@
 """State machine orchestrator for explore() — automated creative exploration."""
+import asyncio
+import json
+import logging
 import uuid
 
 from creativity_mcp.explore_prompts import (
@@ -10,6 +13,8 @@ from creativity_mcp.explore_prompts import (
 )
 from creativity_mcp.llm import FLASH_MODEL, SONNET_MODEL, acall, acall_batch, extract_json
 from creativity_mcp.models import Branch, Constraint, Session
+
+logger = logging.getLogger(__name__)
 
 IntensityConfig: dict[str, tuple[int, int]] = {
     "quick": (1, 2),
@@ -75,6 +80,41 @@ def _format_constraints_for_prompt(constraints: list[Constraint]) -> str:
     return "\n".join(f"- {c.text}" for c in constraints)
 
 
+def _ingest_branches(
+    raw_results: list[str],
+    session: Session,
+    constraints_applied: list[str] | None = None,
+) -> int:
+    """Parse LLM results, dedup, append to session. Returns count added."""
+    added = 0
+    for raw in raw_results:
+        try:
+            parsed = extract_json(raw)
+        except (json.JSONDecodeError, ValueError) as exc:
+            logger.warning("Failed to parse branch response: %s", exc)
+            continue
+        if isinstance(parsed, dict) and "branches" in parsed:
+            branch_list = parsed["branches"]
+        elif isinstance(parsed, list):
+            branch_list = parsed
+        else:
+            continue
+
+        unique = _deduplicate_branches(branch_list, session.branches)
+        for item in unique:
+            if not isinstance(item, dict) or "content" not in item:
+                continue
+            bid = str(uuid.uuid4())[:6]
+            session.branches.append(Branch(
+                id=bid,
+                content=item["content"],
+                is_weird=item.get("is_weird", False),
+                constraints_applied=constraints_applied or [],
+            ))
+            added += 1
+    return added
+
+
 async def run_exploration(
     challenge: str,
     domain: str | None = None,
@@ -131,36 +171,12 @@ async def run_exploration(
             for k in selected_keys
         ]
 
-        # Call lenses in parallel
         results = await acall_batch(FLASH_MODEL, prompts)
+        constraint_ids = [c.id for c in session.constraints]
 
-        new_count_before = len(session.branches)
-
-        for raw in results:
-            try:
-                parsed = extract_json(raw)
-            except Exception:
-                continue
-            if isinstance(parsed, dict) and "branches" in parsed:
-                branch_list = parsed["branches"]
-            elif isinstance(parsed, list):
-                branch_list = parsed
-            else:
-                continue
-
-            unique = _deduplicate_branches(branch_list, session.branches)
-            for item in unique:
-                if not isinstance(item, dict) or "content" not in item:
-                    continue
-                bid = str(uuid.uuid4())[:6]
-                session.branches.append(Branch(
-                    id=bid,
-                    content=item["content"],
-                    is_weird=item.get("is_weird", False),
-                    constraints_applied=[c.id for c in session.constraints],
-                ))
-
-        new_unique = len(session.branches) - new_count_before
+        before = len(session.branches)
+        _ingest_branches(results, session, constraints_applied=constraint_ids)
+        new_unique = len(session.branches) - before
 
         # Saturation check
         if new_unique < 2:
@@ -187,10 +203,10 @@ async def run_exploration(
                     content=weird_data["content"],
                     is_weird=True,
                 ))
-        except Exception:
-            pass
+        except (json.JSONDecodeError, ValueError) as exc:
+            logger.warning("Failed to parse weird branch response: %s", exc)
 
-    # DEEPEN: top 2-3 branches
+    # DEEPEN: top 2-3 branches (index-aligned gather for correct pairing)
     active = session.active_branches
     deepen_targets = active[:3] if len(active) >= 3 else active
     if deepen_targets:
@@ -201,15 +217,21 @@ async def run_exploration(
             )
             for b in deepen_targets
         ]
-        deepen_results = await acall_batch(FLASH_MODEL, revisit_prompts)
+        # Use gather directly to preserve index alignment
+        raw_results = await asyncio.gather(
+            *[acall(FLASH_MODEL, p) for p in revisit_prompts],
+            return_exceptions=True,
+        )
 
-        for i, raw in enumerate(deepen_results):
-            if i >= len(deepen_targets):
-                break
+        for i, raw in enumerate(raw_results):
+            if isinstance(raw, BaseException):
+                logger.warning("Deepen call %d failed: %s", i, raw)
+                continue
             target = deepen_targets[i]
             try:
                 parsed = extract_json(raw)
-            except Exception:
+            except (json.JSONDecodeError, ValueError) as exc:
+                logger.warning("Failed to parse deepen response %d: %s", i, exc)
                 continue
             if not isinstance(parsed, dict):
                 continue
@@ -237,14 +259,25 @@ async def run_exploration(
             branches_summary=branches_summary,
         ),
     )
+    assess_data = {}
     try:
         assess_data = extract_json(assess_raw)
         verdict = assess_data.get("verdict", "acceptable")
-    except Exception:
+    except (json.JSONDecodeError, ValueError) as exc:
+        logger.warning("Failed to parse assessment: %s", exc)
         verdict = "acceptable"
 
     if verdict == "push_harder" and loop_count < max_loops:
-        # One more diversify round
+        # Inject assessor directive as constraint
+        directive = assess_data.get("directive", "")
+        if directive:
+            cid = str(uuid.uuid4())[:6]
+            session.constraints.append(Constraint(
+                id=cid,
+                text=directive,
+                branches_before=len(session.branches),
+            ))
+
         existing_text = _format_branches_for_prompt(session.branches)
         constraints_text = _format_constraints_for_prompt(session.constraints)
         extra_prompts = [
@@ -256,29 +289,15 @@ async def run_exploration(
             for k in list(LENS_PROMPTS.keys())[:parallel_count]
         ]
         extra_results = await acall_batch(FLASH_MODEL, extra_prompts)
-        for raw in extra_results:
-            try:
-                parsed = extract_json(raw)
-            except Exception:
-                continue
-            if isinstance(parsed, dict) and "branches" in parsed:
-                branch_list = parsed["branches"]
-            elif isinstance(parsed, list):
-                branch_list = parsed
-            else:
-                continue
-            unique = _deduplicate_branches(branch_list, session.branches)
-            for item in unique:
-                if not isinstance(item, dict) or "content" not in item:
-                    continue
-                bid = str(uuid.uuid4())[:6]
-                session.branches.append(Branch(
-                    id=bid,
-                    content=item["content"],
-                    is_weird=item.get("is_weird", False),
-                ))
+        constraint_ids = [c.id for c in session.constraints]
+        _ingest_branches(extra_results, session, constraints_applied=constraint_ids)
 
-    # HARVEST
+    # HARVEST — guard against empty session
+    if not session.branches:
+        raise RuntimeError(
+            f"Exploration produced no branches for challenge: {challenge!r}"
+        )
+
     session.harvested = True
 
     active = session.active_branches
@@ -307,6 +326,10 @@ async def extend_exploration(
 
     session = sessions[session_id]
 
+    # Un-harvest if extending a completed session
+    if session.harvested:
+        session.harvested = False
+
     # Inject directive as constraint
     constraint_id = str(uuid.uuid4())[:6]
     session.constraints.append(Constraint(
@@ -332,28 +355,8 @@ async def extend_exploration(
     ]
 
     results = await acall_batch(FLASH_MODEL, prompts)
-
-    for raw in results:
-        try:
-            parsed = extract_json(raw)
-        except Exception:
-            continue
-        if isinstance(parsed, dict) and "branches" in parsed:
-            branch_list = parsed["branches"]
-        elif isinstance(parsed, list):
-            branch_list = parsed
-        else:
-            continue
-        unique = _deduplicate_branches(branch_list, session.branches)
-        for item in unique:
-            if not isinstance(item, dict) or "content" not in item:
-                continue
-            bid = str(uuid.uuid4())[:6]
-            session.branches.append(Branch(
-                id=bid,
-                content=item["content"],
-                is_weird=item.get("is_weird", False),
-            ))
+    constraint_ids = [c.id for c in session.constraints]
+    _ingest_branches(results, session, constraints_applied=constraint_ids)
 
     return {
         "session_id": session_id,

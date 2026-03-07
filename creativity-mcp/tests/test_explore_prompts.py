@@ -3,7 +3,6 @@
 
 def test_all_prompt_constants_exist_and_nonempty():
     from creativity_mcp.explore_prompts import (
-        HARVEST_SUMMARY_PROMPT,
         LENS_PROMPTS,
         PROD_INTERNAL_PROMPT,
         REVISIT_INTERNAL_PROMPT,
@@ -16,7 +15,6 @@ def test_all_prompt_constants_exist_and_nonempty():
         ("REVISIT_INTERNAL_PROMPT", REVISIT_INTERNAL_PROMPT),
         ("WEIRD_INTERNAL_PROMPT", WEIRD_INTERNAL_PROMPT),
         ("PROD_INTERNAL_PROMPT", PROD_INTERNAL_PROMPT),
-        ("HARVEST_SUMMARY_PROMPT", HARVEST_SUMMARY_PROMPT),
     ]:
         assert isinstance(val, str), f"{name} should be a string"
         assert len(val) > 0, f"{name} should be non-empty"
@@ -66,13 +64,6 @@ def test_prod_internal_prompt_placeholders():
 
     assert "{branches_summary}" in PROD_INTERNAL_PROMPT
     assert "{challenge}" in PROD_INTERNAL_PROMPT
-
-
-def test_harvest_summary_prompt_placeholders():
-    from creativity_mcp.explore_prompts import HARVEST_SUMMARY_PROMPT
-
-    assert "{branches}" in HARVEST_SUMMARY_PROMPT
-    assert "{challenge}" in HARVEST_SUMMARY_PROMPT
 
 
 def test_contrarian_lens_mentions_is_weird():

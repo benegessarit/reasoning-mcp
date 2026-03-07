@@ -106,13 +106,16 @@ async def test_run_exploration_creates_session():
     with patch("creativity_mcp.explorer.acall", new_callable=AsyncMock) as mock_acall, \
          patch("creativity_mcp.explorer.acall_batch", new_callable=AsyncMock) as mock_batch:
 
+        # DEEPEN uses asyncio.gather(acall(...)) directly, not acall_batch
         mock_acall.side_effect = [
             _make_spark_response(),                    # SPARK
+            _make_revisit_response(),                  # DEEPEN branch 1
+            _make_revisit_response(),                  # DEEPEN branch 2
+            _make_revisit_response(),                  # DEEPEN branch 3
             _make_prod_response("acceptable"),         # ASSESS
         ]
         mock_batch.side_effect = [
             [_make_branch_response(3, include_weird=True)] * 2,  # DIVERSIFY lens calls
-            [_make_revisit_response()] * 2,                       # DEEPEN
         ]
 
         result = await run_exploration(
@@ -137,11 +140,13 @@ async def test_run_exploration_injects_synthetic_constraint():
 
         mock_acall.side_effect = [
             _make_spark_response(),
+            _make_revisit_response(),                  # DEEPEN branch 1
+            _make_revisit_response(),                  # DEEPEN branch 2
+            _make_revisit_response(),                  # DEEPEN branch 3
             _make_prod_response("acceptable"),
         ]
         mock_batch.side_effect = [
             [_make_branch_response(3, include_weird=True)] * 2,
-            [_make_revisit_response()] * 2,
         ]
 
         await run_exploration("Fix education?", intensity="quick", sessions=sessions)
@@ -158,14 +163,18 @@ async def test_run_exploration_generates_weird_if_missing():
     with patch("creativity_mcp.explorer.acall", new_callable=AsyncMock) as mock_acall, \
          patch("creativity_mcp.explorer.acall_batch", new_callable=AsyncMock) as mock_batch:
 
+        # No weird from lenses → WEIRD gate fires (acall #2)
+        # Then DEEPEN for top 3 branches, then ASSESS
         mock_acall.side_effect = [
-            _make_spark_response(),
-            _make_weird_response(),          # WEIRD gate
-            _make_prod_response("acceptable"),
+            _make_spark_response(),                    # SPARK
+            _make_weird_response(),                    # WEIRD gate
+            _make_revisit_response(),                  # DEEPEN branch 1
+            _make_revisit_response(),                  # DEEPEN branch 2
+            _make_revisit_response(),                  # DEEPEN branch 3
+            _make_prod_response("acceptable"),         # ASSESS
         ]
         mock_batch.side_effect = [
             [_make_branch_response(3, include_weird=False)] * 2,  # No weird from lenses
-            [_make_revisit_response()] * 2,
         ]
 
         await run_exploration("Fix education?", intensity="quick", sessions=sessions)
@@ -304,3 +313,43 @@ async def test_extend_exploration_missing_session():
 
     with pytest.raises(KeyError):
         await extend_exploration("nonexistent", "explore", sessions=sessions)
+
+
+@pytest.mark.anyio
+async def test_run_exploration_raises_on_zero_branches():
+    """Harvest guard raises RuntimeError when no branches produced."""
+    sessions = {}
+
+    with patch("creativity_mcp.explorer.acall", new_callable=AsyncMock) as mock_acall, \
+         patch("creativity_mcp.explorer.acall_batch", new_callable=AsyncMock) as mock_batch:
+
+        # Diversify returns garbage → 0 branches → WEIRD gate fires (also garbage)
+        # → 0 branches → DEEPEN skipped → ASSESS runs → harvest guard raises
+        mock_acall.side_effect = [
+            _make_spark_response(),                    # SPARK
+            "not valid json",                          # WEIRD gate (unparseable)
+            _make_prod_response("acceptable"),         # ASSESS
+        ]
+        mock_batch.side_effect = [
+            ["not valid json"] * 2,                    # DIVERSIFY (unparseable)
+        ]
+
+        with pytest.raises(RuntimeError, match="no branches"):
+            await run_exploration("Test?", intensity="quick", sessions=sessions)
+
+
+@pytest.mark.anyio
+async def test_extend_exploration_unharvests_session():
+    """extend_exploration resets harvested flag on completed sessions."""
+    sessions = {}
+    session = Session(id="test-2", challenge="Test challenge")
+    session.branches.append(Branch(id="b1", content="Existing direction"))
+    session.harvested = True
+    sessions["test-2"] = session
+
+    with patch("creativity_mcp.explorer.acall_batch", new_callable=AsyncMock) as mock_batch:
+        mock_batch.return_value = [_make_branch_response(2)]
+
+        await extend_exploration("test-2", "go deeper", sessions=sessions)
+
+    assert session.harvested is False

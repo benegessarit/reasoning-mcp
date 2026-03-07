@@ -13,6 +13,8 @@ SONNET_MODEL = "anthropic/claude-sonnet-4-20250514"
 
 _client: httpx.AsyncClient | None = None
 
+_NON_RETRYABLE = (401, 403)
+
 
 def _get_api_key() -> str:
     key = os.environ.get("OPENROUTER_API_KEY", "")
@@ -26,6 +28,14 @@ async def _get_client() -> httpx.AsyncClient:
     if _client is None or _client.is_closed:
         _client = httpx.AsyncClient(timeout=30.0)
     return _client
+
+
+async def close_client() -> None:
+    """Shut down the shared httpx client. Call on server shutdown."""
+    global _client
+    if _client is not None and not _client.is_closed:
+        await _client.aclose()
+    _client = None
 
 
 async def acall(model: str, prompt: str, temperature: float = 1.0) -> str:
@@ -46,6 +56,12 @@ async def acall(model: str, prompt: str, temperature: float = 1.0) -> str:
             )
             response.raise_for_status()
             return response.json()["choices"][0]["message"]["content"]
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code in _NON_RETRYABLE:
+                raise
+            last_exc = exc
+            if attempt == 0:
+                await asyncio.sleep(2)
         except Exception as exc:
             last_exc = exc
             if attempt == 0:
@@ -71,6 +87,8 @@ def extract_json(text: str) -> dict | list:
     """Extract JSON from text, handling markdown code blocks."""
     text = text.strip()
     if text.startswith("```"):
-        lines = text.split("\n")
-        text = "\n".join(lines[1:-1])
+        first_newline = text.index("\n")
+        text = text[first_newline + 1:]
+        if text.endswith("```"):
+            text = text[:-3]
     return json.loads(text)
