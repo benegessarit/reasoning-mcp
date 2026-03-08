@@ -131,6 +131,24 @@ async def run_exploration(
     # INIT
     session_id = str(uuid.uuid4())[:8]
     session = Session(id=session_id, challenge=challenge, domain=domain)
+
+    try:
+        return await _run_exploration_inner(session, sessions, max_loops, parallel_count, challenge, domain)
+    except Exception:
+        sessions.pop(session_id, None)
+        raise
+
+
+async def _run_exploration_inner(
+    session: Session,
+    sessions: dict[str, Session],
+    max_loops: int,
+    parallel_count: int,
+    challenge: str,
+    domain: str | None,
+) -> dict:
+    """Inner exploration loop. Session is published only on success."""
+    session_id = session.id
     sessions[session_id] = session
 
     # SPARK

@@ -150,9 +150,9 @@ BRANCHES:
 
 Are these actually different directions or variations on the same idea? Has the space been genuinely explored or just skimmed?
 
-Return JSON:
+Return JSON (verdict is either "push_harder" or "acceptable"):
 {{
-  "verdict": "push_harder" or "acceptable",
+  "verdict": "push_harder",
   "directive": "What specifically should happen next"
 }}
 

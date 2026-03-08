@@ -99,11 +99,18 @@ async def test_explore_more_adds_to_session():
     sessions[sid].harvested = False
     initial_count = len(sessions[sid].branches)
 
-    with patch("creativity_mcp.explorer.acall_batch", side_effect=_mock_batch):
+    def _extend_branch_response(n=2):
+        return json.dumps([{"content": f"Extended direction {i} unique", "is_weird": False} for i in range(n)])
+
+    async def _extend_batch(model, prompts, temperature=1.0):
+        return [_extend_branch_response()] * len(prompts)
+
+    with patch("creativity_mcp.explorer.acall_batch", side_effect=_extend_batch):
         raw2 = await explore_more(sid, "go deeper")
 
     result2 = json.loads(raw2)
     assert result2["session_id"] == sid
+    assert len(sessions[sid].branches) > initial_count, "explore_more should add branches"
 
 
 @pytest.mark.anyio

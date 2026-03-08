@@ -703,6 +703,10 @@ async def revisit_register(
         return _json({"error": f"Session '{session_id}' not found"})
 
     session = sessions[session_id]
+
+    if session.harvested:
+        session.harvested = False
+
     branch = session.get_branch(branch_id)
 
     if not branch:
@@ -813,6 +817,12 @@ async def mutate_register(
         return _json({"error": f"Session '{session_id}' not found"})
 
     session = sessions[session_id]
+
+    if not session.get_branch(branch_id):
+        return _json({"error": f"Branch '{branch_id}' not found"})
+
+    if session.harvested:
+        session.harvested = False
 
     try:
         data = _normalize_json(result)

@@ -43,8 +43,8 @@ async def test_acall_success():
 
 
 @pytest.mark.anyio
-async def test_acall_retry_on_failure():
-    """acall retries once on failure, returns on second success."""
+async def test_acall_retry_on_http_error():
+    """acall retries once on HTTPStatusError, returns on second success."""
     _, mock_response = _mock_client_with_response("retried ok")
     client = AsyncMock()
     client.is_closed = False
@@ -63,8 +63,28 @@ async def test_acall_retry_on_failure():
 
 
 @pytest.mark.anyio
-async def test_acall_raises_after_both_fail():
-    """acall raises after both attempts fail."""
+async def test_acall_retry_on_transport_error():
+    """acall retries once on TransportError, returns on second success."""
+    _, mock_response = _mock_client_with_response("retried ok")
+    client = AsyncMock()
+    client.is_closed = False
+    client.post.side_effect = [
+        httpx.ConnectError("connection refused"),
+        mock_response,
+    ]
+
+    with patch.object(llm_mod, "_get_client", new_callable=AsyncMock, return_value=client), \
+         patch.object(llm_mod, "_get_api_key", return_value="test-key"), \
+         patch("creativity_mcp.llm.asyncio.sleep", new_callable=AsyncMock):
+        result = await llm_mod.acall("google/gemini-2.0-flash-001", "test prompt")
+
+    assert result == "retried ok"
+    assert client.post.call_count == 2
+
+
+@pytest.mark.anyio
+async def test_acall_raises_after_both_http_errors():
+    """acall raises after both attempts fail with HTTPStatusError."""
     client = AsyncMock()
     client.is_closed = False
     client.post.side_effect = httpx.HTTPStatusError(
@@ -75,6 +95,21 @@ async def test_acall_raises_after_both_fail():
          patch.object(llm_mod, "_get_api_key", return_value="test-key"), \
          patch("creativity_mcp.llm.asyncio.sleep", new_callable=AsyncMock):
         with pytest.raises(httpx.HTTPStatusError):
+            await llm_mod.acall("google/gemini-2.0-flash-001", "test prompt")
+        assert client.post.call_count == 2
+
+
+@pytest.mark.anyio
+async def test_acall_raises_after_both_transport_errors():
+    """acall raises after both attempts fail with TransportError."""
+    client = AsyncMock()
+    client.is_closed = False
+    client.post.side_effect = httpx.ConnectError("connection refused")
+
+    with patch.object(llm_mod, "_get_client", new_callable=AsyncMock, return_value=client), \
+         patch.object(llm_mod, "_get_api_key", return_value="test-key"), \
+         patch("creativity_mcp.llm.asyncio.sleep", new_callable=AsyncMock):
+        with pytest.raises(httpx.ConnectError):
             await llm_mod.acall("google/gemini-2.0-flash-001", "test prompt")
         assert client.post.call_count == 2
 

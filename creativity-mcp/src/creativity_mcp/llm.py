@@ -42,7 +42,7 @@ async def acall(model: str, prompt: str, temperature: float = 1.0) -> str:
     """Single async OpenRouter call with 1 retry."""
     api_key = _get_api_key()
     client = await _get_client()
-    last_exc = None
+    last_exc: Exception | None = None
     for attempt in range(2):
         try:
             response = await client.post(
@@ -55,18 +55,17 @@ async def acall(model: str, prompt: str, temperature: float = 1.0) -> str:
                 },
             )
             response.raise_for_status()
-            return response.json()["choices"][0]["message"]["content"]
         except httpx.HTTPStatusError as exc:
             if exc.response.status_code in _NON_RETRYABLE:
                 raise
             last_exc = exc
-            if attempt == 0:
-                await asyncio.sleep(2)
-        except Exception as exc:
+        except httpx.TransportError as exc:
             last_exc = exc
-            if attempt == 0:
-                await asyncio.sleep(2)
-    raise last_exc
+        else:
+            return response.json()["choices"][0]["message"]["content"]
+        if attempt == 0:
+            await asyncio.sleep(2)
+    raise last_exc  # type: ignore[misc]  # loop guarantees last_exc is set if we reach here
 
 
 async def acall_batch(
