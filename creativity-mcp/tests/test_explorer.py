@@ -353,3 +353,141 @@ async def test_extend_exploration_unharvests_session():
         await extend_exploration("test-2", "go deeper", sessions=sessions)
 
     assert session.harvested is False
+
+
+# --- _format_context_block ---
+
+
+def test_format_context_block_with_context():
+    from creativity_mcp.explorer import _format_context_block
+
+    result = _format_context_block("some domain context")
+    assert result == "\nCONTEXT:\nsome domain context"
+
+
+def test_format_context_block_with_none():
+    from creativity_mcp.explorer import _format_context_block
+
+    assert _format_context_block(None) == ""
+
+
+def test_format_context_block_with_empty_string():
+    from creativity_mcp.explorer import _format_context_block
+
+    assert _format_context_block("") == ""
+
+
+# --- context threading ---
+
+
+@pytest.mark.anyio
+async def test_run_exploration_with_context():
+    """run_exploration passes context through to prompts."""
+    sessions = {}
+    captured_prompts = []
+
+    async def capture_acall(model, prompt, temperature=1.0):
+        captured_prompts.append(prompt)
+        if "Restate" in prompt or "open exploration" in prompt:
+            return _make_spark_response()
+        if "weird" in prompt.lower():
+            return _make_weird_response()
+        if "Go deeper" in prompt:
+            return _make_revisit_response()
+        return _make_prod_response("acceptable")
+
+    async def capture_batch(model, prompts, temperature=1.0):
+        captured_prompts.extend(prompts)
+        return [_make_branch_response(3, include_weird=True)] * len(prompts)
+
+    with patch("creativity_mcp.explorer.acall", side_effect=capture_acall), \
+         patch("creativity_mcp.explorer.acall_batch", side_effect=capture_batch):
+
+        await run_exploration(
+            "Fix education?",
+            context="We are a K-12 school district in rural Montana",
+            intensity="quick",
+            sessions=sessions,
+        )
+
+    # Context should appear in prompts
+    context_prompts = [p for p in captured_prompts if "CONTEXT:" in p]
+    assert len(context_prompts) > 0, "Context block should appear in at least one prompt"
+    assert any("rural Montana" in p for p in context_prompts)
+
+
+# --- output_file ---
+
+
+@pytest.mark.anyio
+async def test_run_exploration_with_output_file(tmp_path):
+    """output_file writes full JSON and returns summary-only dict."""
+    sessions = {}
+    output_path = str(tmp_path / "output.json")
+
+    async def mock_acall_fn(model, prompt, temperature=1.0):
+        if "Restate" in prompt or "open exploration" in prompt:
+            return _make_spark_response()
+        if "weird" in prompt.lower():
+            return _make_weird_response()
+        if "Go deeper" in prompt:
+            return _make_revisit_response()
+        return _make_prod_response("acceptable")
+
+    async def mock_batch_fn(model, prompts, temperature=1.0):
+        return [_make_branch_response(3, include_weird=True)] * len(prompts)
+
+    with patch("creativity_mcp.explorer.acall", side_effect=mock_acall_fn), \
+         patch("creativity_mcp.explorer.acall_batch", side_effect=mock_batch_fn):
+
+        result = await run_exploration(
+            "Fix education?",
+            output_file=output_path,
+            intensity="quick",
+            sessions=sessions,
+        )
+
+    # Summary-only result
+    assert "session_id" in result
+    assert "output_file" in result
+    assert result["output_file"] == output_path
+    assert "branches" not in result  # full branches in file, not return
+    assert "summary" in result
+    assert "total_branches" in result["summary"]
+
+    # File contains full data
+    import json as _json
+    with open(output_path) as f:
+        file_data = _json.load(f)
+    assert "branches" in file_data
+    assert len(file_data["branches"]) > 0
+
+
+@pytest.mark.anyio
+async def test_run_exploration_without_output_file_returns_full():
+    """Without output_file, returns full branches inline."""
+    sessions = {}
+
+    async def mock_acall_fn(model, prompt, temperature=1.0):
+        if "Restate" in prompt or "open exploration" in prompt:
+            return _make_spark_response()
+        if "weird" in prompt.lower():
+            return _make_weird_response()
+        if "Go deeper" in prompt:
+            return _make_revisit_response()
+        return _make_prod_response("acceptable")
+
+    async def mock_batch_fn(model, prompts, temperature=1.0):
+        return [_make_branch_response(3, include_weird=True)] * len(prompts)
+
+    with patch("creativity_mcp.explorer.acall", side_effect=mock_acall_fn), \
+         patch("creativity_mcp.explorer.acall_batch", side_effect=mock_batch_fn):
+
+        result = await run_exploration(
+            "Fix education?",
+            intensity="quick",
+            sessions=sessions,
+        )
+
+    assert "branches" in result
+    assert len(result["branches"]) > 0
