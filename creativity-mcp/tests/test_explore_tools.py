@@ -1,6 +1,6 @@
 """Tests for explore and explore_more MCP tools."""
 import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -118,3 +118,35 @@ async def test_explore_more_missing_session():
     raw = await explore_more("nonexistent", "go deeper")
     result = json.loads(raw)
     assert "error" in result
+
+
+@pytest.mark.anyio
+async def test_explore_tool_with_context():
+    """explore() accepts context param and passes it through."""
+    with patch("creativity_mcp.explorer.acall", side_effect=_mock_acall), \
+         patch("creativity_mcp.explorer.acall_batch", side_effect=_mock_batch):
+        raw = await explore("Test?", context="biotech domain info")
+
+    result = json.loads(raw)
+    assert "session_id" in result
+    assert result["session_id"] in sessions
+
+
+@pytest.mark.anyio
+async def test_explore_tool_with_output_file(tmp_path):
+    """explore() with output_file writes file and returns summary."""
+    output_path = str(tmp_path / "out.json")
+
+    with patch("creativity_mcp.explorer.acall", side_effect=_mock_acall), \
+         patch("creativity_mcp.explorer.acall_batch", side_effect=_mock_batch):
+        raw = await explore("Test?", output_file=output_path)
+
+    result = json.loads(raw)
+    assert "output_file" in result
+    assert result["output_file"] == output_path
+    assert "branches" not in result
+
+    import json as _json
+    with open(output_path) as f:
+        file_data = _json.load(f)
+    assert "branches" in file_data

@@ -8,7 +8,7 @@ SPARK_INTERNAL_PROMPT = """Restate this challenge as an open exploration space.
 
 CHALLENGE: {challenge}
 {domain}
-
+{context_block}
 Return JSON:
 {{
   "challenge": "Your open-ended restatement",
@@ -27,7 +27,7 @@ EXISTING BRANCHES:
 
 CONSTRAINTS:
 {constraints}
-
+{context_block}
 Think about mechanisms, systems, architectures, implementations, materials, processes, and technical tradeoffs. What engineering approaches has no one considered?
 
 Each branch must be meaningfully different from existing ones.
@@ -47,7 +47,7 @@ EXISTING BRANCHES:
 
 CONSTRAINTS:
 {constraints}
-
+{context_block}
 Think about emotions, relationships, social dynamics, lived experiences, cultural context, and what people actually feel and need. What human truths has no one surfaced?
 
 Each branch must be meaningfully different from existing ones.
@@ -67,7 +67,7 @@ EXISTING BRANCHES:
 
 CONSTRAINTS:
 {constraints}
-
+{context_block}
 Think about feedback loops, emergent behavior, second-order effects, network dynamics, equilibria, and how parts interact to produce wholes. What systemic patterns has no one identified?
 
 Each branch must be meaningfully different from existing ones.
@@ -87,7 +87,7 @@ EXISTING BRANCHES:
 
 CONSTRAINTS:
 {constraints}
-
+{context_block}
 Break rules. Question premises. Flip the problem. What if the opposite were true? What if the constraint everyone accepts is wrong?
 
 IMPORTANT: At least ONE branch MUST have "is_weird": true and should break an unstated assumption or make the reader uncomfortable. Push past what feels safe.
@@ -108,7 +108,7 @@ CHALLENGE: {challenge}
 
 BRANCH TO REVISIT:
 {branch_content}
-
+{context_block}
 Generate 1-2 sub-branches that deepen this idea. What sub-directions exist? What would this look like taken further?
 
 Return JSON:
@@ -127,7 +127,7 @@ CHALLENGE: {challenge}
 
 EXISTING BRANCHES:
 {existing_branches}
-
+{context_block}
 This is a fallback — the contrarian lens didn't produce anything weird enough. Push harder.
 
 Weird means: breaks an unstated assumption, combines things that don't go together, makes you uncomfortable to suggest.
@@ -147,7 +147,7 @@ CHALLENGE: {challenge}
 
 BRANCHES:
 {branches_summary}
-
+{context_block}
 Are these actually different directions or variations on the same idea? Has the space been genuinely explored or just skimmed?
 
 Return JSON (verdict is either "push_harder" or "acceptable"):

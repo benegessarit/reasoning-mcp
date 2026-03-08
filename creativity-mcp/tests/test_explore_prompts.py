@@ -94,3 +94,47 @@ def test_weird_internal_prompt_mentions_is_weird_true():
     from creativity_mcp.explore_prompts import WEIRD_INTERNAL_PROMPT
 
     assert '"is_weird": true' in WEIRD_INTERNAL_PROMPT or '"is_weird":true' in WEIRD_INTERNAL_PROMPT
+
+
+def test_all_prompts_contain_context_block_placeholder():
+    """Every prompt template must include {context_block} for context threading."""
+    from creativity_mcp.explore_prompts import (
+        LENS_PROMPTS,
+        PROD_INTERNAL_PROMPT,
+        REVISIT_INTERNAL_PROMPT,
+        SPARK_INTERNAL_PROMPT,
+        WEIRD_INTERNAL_PROMPT,
+    )
+
+    for name, prompt in [
+        ("SPARK_INTERNAL_PROMPT", SPARK_INTERNAL_PROMPT),
+        ("REVISIT_INTERNAL_PROMPT", REVISIT_INTERNAL_PROMPT),
+        ("WEIRD_INTERNAL_PROMPT", WEIRD_INTERNAL_PROMPT),
+        ("PROD_INTERNAL_PROMPT", PROD_INTERNAL_PROMPT),
+    ]:
+        assert "{context_block}" in prompt, f"{name} missing {{context_block}} placeholder"
+
+    for key, prompt in LENS_PROMPTS.items():
+        assert "{context_block}" in prompt, f"LENS_PROMPTS[{key}] missing {{context_block}} placeholder"
+
+
+def test_all_prompts_format_with_context_block_kwarg():
+    """Every prompt must accept context_block as a .format() kwarg without KeyError."""
+    from creativity_mcp.explore_prompts import (
+        LENS_PROMPTS,
+        PROD_INTERNAL_PROMPT,
+        REVISIT_INTERNAL_PROMPT,
+        SPARK_INTERNAL_PROMPT,
+        WEIRD_INTERNAL_PROMPT,
+    )
+
+    SPARK_INTERNAL_PROMPT.format(challenge="test", domain="test", context_block="")
+    SPARK_INTERNAL_PROMPT.format(challenge="test", domain="test", context_block="\nCONTEXT:\nsome context")
+
+    for key, prompt in LENS_PROMPTS.items():
+        prompt.format(challenge="test", existing_branches="test", constraints="test", context_block="")
+        prompt.format(challenge="test", existing_branches="test", constraints="test", context_block="\nCONTEXT:\ninfo")
+
+    REVISIT_INTERNAL_PROMPT.format(challenge="test", branch_content="test", context_block="")
+    WEIRD_INTERNAL_PROMPT.format(challenge="test", existing_branches="test", context_block="")
+    PROD_INTERNAL_PROMPT.format(challenge="test", branches_summary="test", context_block="")

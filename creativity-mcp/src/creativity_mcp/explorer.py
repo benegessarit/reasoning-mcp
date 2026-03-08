@@ -2,6 +2,7 @@
 import asyncio
 import json
 import logging
+import os
 import uuid
 
 from creativity_mcp.explore_prompts import (
@@ -80,6 +81,13 @@ def _format_constraints_for_prompt(constraints: list[Constraint]) -> str:
     return "\n".join(f"- {c.text}" for c in constraints)
 
 
+def _format_context_block(context: str | None) -> str:
+    """Format context as a block for prompt injection. Returns '' if no context."""
+    if context:
+        return f"\nCONTEXT:\n{context}"
+    return ""
+
+
 def _ingest_branches(
     raw_results: list[str],
     session: Session,
@@ -119,10 +127,16 @@ async def run_exploration(
     challenge: str,
     domain: str | None = None,
     intensity: str = "standard",
+    context: str | None = None,
+    output_file: str | None = None,
     *,
     sessions: dict[str, Session],
 ) -> dict:
     """Run a full creative exploration loop.
+
+    Args:
+        context: Free-text background context injected into all LLM prompts.
+        output_file: If set, write full branch JSON to this path and return summary-only.
 
     Returns dict with session_id, branches, and summary.
     """
@@ -133,10 +147,30 @@ async def run_exploration(
     session = Session(id=session_id, challenge=challenge, domain=domain)
 
     try:
-        return await _run_exploration_inner(session, sessions, max_loops, parallel_count, challenge, domain)
+        result = await _run_exploration_inner(
+            session, sessions, max_loops, parallel_count, challenge, domain, context,
+        )
     except Exception:
         sessions.pop(session_id, None)
         raise
+
+    if output_file:
+        try:
+            tmp_path = output_file + ".tmp"
+            with open(tmp_path, "w") as f:
+                json.dump(result, f, indent=2)
+            os.rename(tmp_path, output_file)
+            return {
+                "session_id": result["session_id"],
+                "challenge": result["challenge"],
+                "branch_count": len(result["branches"]),
+                "output_file": output_file,
+                "summary": result["summary"],
+            }
+        except OSError as exc:
+            logger.warning("Failed to write output file %s: %s", output_file, exc)
+
+    return result
 
 
 async def _run_exploration_inner(
@@ -146,16 +180,20 @@ async def _run_exploration_inner(
     parallel_count: int,
     challenge: str,
     domain: str | None,
+    context: str | None = None,
 ) -> dict:
     """Inner exploration loop. Session is published only on success."""
     session_id = session.id
     sessions[session_id] = session
+    context_block = _format_context_block(context)
 
     # SPARK
     domain_ctx = f"\nDOMAIN: {domain}" if domain else ""
     spark_raw = await acall(
         FLASH_MODEL,
-        SPARK_INTERNAL_PROMPT.format(challenge=challenge, domain=domain_ctx),
+        SPARK_INTERNAL_PROMPT.format(
+            challenge=challenge, domain=domain_ctx, context_block=context_block,
+        ),
     )
     spark_data = extract_json(spark_raw)
     session.challenge = spark_data.get("challenge", challenge)
@@ -185,6 +223,7 @@ async def _run_exploration_inner(
                 challenge=session.challenge,
                 existing_branches=existing_text,
                 constraints=constraints_text,
+                context_block=context_block,
             )
             for k in selected_keys
         ]
@@ -210,6 +249,7 @@ async def _run_exploration_inner(
             WEIRD_INTERNAL_PROMPT.format(
                 challenge=session.challenge,
                 existing_branches=existing_text,
+                context_block=context_block,
             ),
         )
         try:
@@ -232,6 +272,7 @@ async def _run_exploration_inner(
             REVISIT_INTERNAL_PROMPT.format(
                 challenge=session.challenge,
                 branch_content=b.content,
+                context_block=context_block,
             )
             for b in deepen_targets
         ]
@@ -275,6 +316,7 @@ async def _run_exploration_inner(
         PROD_INTERNAL_PROMPT.format(
             challenge=session.challenge,
             branches_summary=branches_summary,
+            context_block=context_block,
         ),
     )
     assess_data = {}
@@ -303,6 +345,7 @@ async def _run_exploration_inner(
                 challenge=session.challenge,
                 existing_branches=existing_text,
                 constraints=constraints_text,
+                context_block=context_block,
             )
             for k in list(LENS_PROMPTS.keys())[:parallel_count]
         ]
@@ -368,6 +411,7 @@ async def extend_exploration(
             challenge=f"{session.challenge}\n\nDIRECTIVE: {directive}",
             existing_branches=existing_text,
             constraints=constraints_text,
+            context_block="",
         )
         for k in lens_keys
     ]

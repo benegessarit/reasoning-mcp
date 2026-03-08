@@ -18,6 +18,8 @@ async def explore(
     challenge: str,
     domain: str | None = None,
     intensity: str = "standard",
+    context: str | None = None,
+    output_file: str | None = None,
 ) -> str:
     """Run a full automated creative exploration.
 
@@ -28,13 +30,18 @@ async def explore(
         challenge: The creative challenge to explore
         domain: Optional domain context
         intensity: quick (1 loop, 2 lenses) | standard (2 loops, 4 lenses) | deep (3 loops, 4 lenses)
+        context: Free-text background context injected into all LLM prompts (1-3 paragraphs recommended)
+        output_file: If set, write full branch JSON to this path and return summary-only
 
     Returns:
         JSON with session_id, branches, and exploration summary
     """
     from creativity_mcp.explorer import run_exploration
 
-    result = await run_exploration(challenge, domain, intensity, sessions=sessions)
+    result = await run_exploration(
+        challenge, domain, intensity, context=context, output_file=output_file,
+        sessions=sessions,
+    )
     return _json(result)
 
 
