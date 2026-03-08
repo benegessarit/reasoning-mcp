@@ -8,8 +8,8 @@ import httpx
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-FLASH_MODEL = "google/gemini-2.0-flash-001"
-SONNET_MODEL = "anthropic/claude-sonnet-4-20250514"
+FLASH_MODEL = "openai/gpt-5.4"
+SONNET_MODEL = "openai/gpt-5.4"
 
 _client: httpx.AsyncClient | None = None
 
@@ -26,7 +26,7 @@ def _get_api_key() -> str:
 async def _get_client() -> httpx.AsyncClient:
     global _client
     if _client is None or _client.is_closed:
-        _client = httpx.AsyncClient(timeout=30.0)
+        _client = httpx.AsyncClient(timeout=120.0)
     return _client
 
 
@@ -51,6 +51,7 @@ async def acall(model: str, prompt: str, temperature: float = 1.0) -> str:
                 json={
                     "model": model,
                     "temperature": temperature,
+                    "reasoning": {"effort": "high"},
                     "messages": [{"role": "user", "content": prompt}],
                 },
             )
