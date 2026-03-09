@@ -12,7 +12,7 @@ from mcp.server.fastmcp import FastMCP
 from reasoning_mcp.models import Agent, Invocation, Perturbation, Session
 from reasoning_mcp.prompts import (
     CHAOS_INSTRUCTION,
-    DEPTH_PROBE_PROMPT,
+    DEPTH_PROBE_PROMPTS,
     ENSEMBLE_PROMPT,
     INVOKE_PROMPT,
     ORCHESTRATOR_INSTRUCTION,
@@ -533,28 +533,44 @@ async def get_session_state(session_id: str) -> str:
 @mcp.tool()
 async def depth_probe(
     question: str,
+    mode: Literal["vanilla", "failure", "assumption", "stakeholder", "meta"] = "vanilla",
+    prior: str | dict | None = None,
     result: str | dict | None = None,
 ) -> str:
     """Metacognitive audit of reasoning process before executing.
 
-    Forces examination of the thinking itself: Is the framing right? What kind of
-    reasoning is needed? Where will analysis be shallow? What's missing?
+    Forces examination of the thinking itself from different cognitive orientations.
+
+    Modes:
+    - vanilla: Is the framing right? Where will reasoning be shallow?
+    - failure: What are the most plausible wrong answers?
+    - assumption: What unstated assumptions does this question bake in?
+    - stakeholder: Who would disagree with the obvious answer and why?
+    - meta: Re-probe using findings from a previous probe (requires prior)
 
     Call without result to get the self-interrogation prompt.
     Call with result JSON to capture the reflection.
 
     Args:
         question: The question/problem to probe
+        mode: Cognitive orientation for the probe (default: vanilla)
+        prior: Previous probe findings for meta mode (string or dict, ignored by other modes)
         result: JSON with reframing, thinking_required, shallow_spots, missing_dimensions, process_critique
-
-    Returns:
-        Without result: Prompt for meta-reasoning audit
-        With result: The captured reflection
     """
+    if mode == "meta" and prior is None and result is None:
+        return _json({"error": "meta mode requires 'prior' parameter with previous probe findings"})
+
     if result is None:
+        # Use .replace() instead of .format() to avoid KeyError on user braces
+        prompt = DEPTH_PROBE_PROMPTS[mode].replace("{question}", question)
+        if mode == "meta":
+            prior_text = json.dumps(prior, indent=2) if isinstance(prior, dict) else prior
+            prompt = prompt.replace("{prior}", prior_text)
+
         return _json({
             "action": "depth_probe",
-            "prompt": DEPTH_PROBE_PROMPT.format(question=question),
+            "mode": mode,
+            "prompt": prompt,
             "next_step": "Audit your reasoning process, then call depth_probe with result JSON",
         })
 
@@ -573,6 +589,7 @@ async def depth_probe(
 
     return _json({
         "probed": True,
+        "mode": mode,
         "reframing": data["reframing"],
         "thinking_required": data["thinking_required"],
         "shallow_spots": data["shallow_spots"],
