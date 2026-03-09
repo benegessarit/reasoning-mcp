@@ -561,15 +561,11 @@ async def depth_probe(
         return _json({"error": "meta mode requires 'prior' parameter with previous probe findings"})
 
     if result is None:
-        # Serialize prior dict if needed
-        prior_text = json.dumps(prior, indent=2) if isinstance(prior, dict) else prior
-
-        # Select prompt by mode
-        template = DEPTH_PROBE_PROMPTS[mode]
+        # Use .replace() instead of .format() to avoid KeyError on user braces
+        prompt = DEPTH_PROBE_PROMPTS[mode].replace("{question}", question)
         if mode == "meta":
-            prompt = template.format(question=question, prior=prior_text)
-        else:
-            prompt = template.format(question=question)
+            prior_text = json.dumps(prior, indent=2) if isinstance(prior, dict) else prior
+            prompt = prompt.replace("{prior}", prior_text)
 
         return _json({
             "action": "depth_probe",

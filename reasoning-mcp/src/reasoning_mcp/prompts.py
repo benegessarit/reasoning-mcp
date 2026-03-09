@@ -269,7 +269,8 @@ _DEPTH_PROBE_JSON_SCHEMA = """Respond with JSON:
 }}"""
 
 DEPTH_PROBE_PROMPTS = {
-    "vanilla": DEPTH_PROBE_PROMPT,
+    # Pre-resolve double braces so all modes work uniformly with .replace()
+    "vanilla": DEPTH_PROBE_PROMPT.replace("{{", "{").replace("}}", "}"),
 
     "failure": """STOP. Before you think, hunt for plausible wrong answers.
 

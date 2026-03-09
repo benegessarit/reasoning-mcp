@@ -590,11 +590,19 @@ async def test_depth_probe_default_returns_vanilla_prompt():
 
 @pytest.mark.asyncio
 async def test_depth_probe_vanilla_prompt_matches_original():
-    """mode='vanilla' uses the original DEPTH_PROBE_PROMPT unchanged."""
+    """mode='vanilla' produces same output as original DEPTH_PROBE_PROMPT.format()."""
     from reasoning_mcp.prompts import DEPTH_PROBE_PROMPT
     result = json.loads(await depth_probe(question="Test?", mode="vanilla"))
     expected = DEPTH_PROBE_PROMPT.format(question="Test?")
     assert result["prompt"] == expected
+
+
+@pytest.mark.asyncio
+async def test_depth_probe_question_with_braces():
+    """Questions containing braces don't crash or swallow text."""
+    result = json.loads(await depth_probe(question="What about {foo} and {bar}?"))
+    assert "{foo}" in result["prompt"]
+    assert "{bar}" in result["prompt"]
 
 
 @pytest.mark.asyncio
