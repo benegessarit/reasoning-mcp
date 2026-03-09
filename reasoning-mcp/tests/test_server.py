@@ -2,6 +2,7 @@
 import json
 import pytest
 from reasoning_mcp.server import (
+    depth_probe,
     ensemble,
     invoke,
     perturb,
@@ -563,3 +564,145 @@ async def test_orchestrator_prompt_includes_context():
     ))
     assert "Performance Engineer" in result["prompt"]
     assert "Data Integrity Hawk" in result["prompt"]
+
+
+# --- depth_probe mode tests ---
+
+def _sample_depth_result():
+    """Sample valid depth_probe result JSON."""
+    return {
+        "reframing": "The real question is about trade-offs",
+        "thinking_required": "Systems thinking",
+        "shallow_spots": "Will hand-wave on implementation",
+        "missing_dimensions": "Political dynamics",
+        "process_critique": "Too linear, need parallel analysis",
+    }
+
+
+@pytest.mark.asyncio
+async def test_depth_probe_default_returns_vanilla_prompt():
+    """Default call works unchanged — vanilla mode."""
+    result = json.loads(await depth_probe(question="Should we refactor?"))
+    assert result["action"] == "depth_probe"
+    assert "prompt" in result
+    assert "AM I FRAMING THIS RIGHT?" in result["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_depth_probe_vanilla_prompt_matches_original():
+    """mode='vanilla' uses the original DEPTH_PROBE_PROMPT unchanged."""
+    from reasoning_mcp.prompts import DEPTH_PROBE_PROMPT
+    result = json.loads(await depth_probe(question="Test?", mode="vanilla"))
+    expected = DEPTH_PROBE_PROMPT.format(question="Test?")
+    assert result["prompt"] == expected
+
+
+@pytest.mark.asyncio
+async def test_depth_probe_failure_mode_prompt():
+    """mode='failure' returns failure-oriented prompt."""
+    result = json.loads(await depth_probe(question="Test?", mode="failure"))
+    assert result["action"] == "depth_probe"
+    assert result["mode"] == "failure"
+    assert "wrong answers" in result["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_depth_probe_assumption_mode_prompt():
+    """mode='assumption' returns assumption-oriented prompt."""
+    result = json.loads(await depth_probe(question="Test?", mode="assumption"))
+    assert result["action"] == "depth_probe"
+    assert result["mode"] == "assumption"
+    assert "UNSTATED ASSUMPTIONS" in result["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_depth_probe_stakeholder_mode_prompt():
+    """mode='stakeholder' returns stakeholder-oriented prompt."""
+    result = json.loads(await depth_probe(question="Test?", mode="stakeholder"))
+    assert result["action"] == "depth_probe"
+    assert result["mode"] == "stakeholder"
+    assert "disagree" in result["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_depth_probe_meta_mode_prompt():
+    """mode='meta' returns meta probe prompt with prior."""
+    result = json.loads(await depth_probe(
+        question="Test?",
+        mode="meta",
+        prior="The framing was too narrow",
+    ))
+    assert result["action"] == "depth_probe"
+    assert result["mode"] == "meta"
+    assert "The framing was too narrow" in result["prompt"]
+    assert "previous probe" in result["prompt"].lower()
+
+
+@pytest.mark.asyncio
+async def test_depth_probe_meta_requires_prior():
+    """mode='meta' with prior=None returns error."""
+    result = json.loads(await depth_probe(question="Test?", mode="meta"))
+    assert "error" in result
+    assert "prior" in result["error"].lower()
+
+
+@pytest.mark.asyncio
+async def test_depth_probe_all_modes_return_prompts():
+    """All 5 modes return valid prompts on first call."""
+    for mode in ("vanilla", "failure", "assumption", "stakeholder"):
+        result = json.loads(await depth_probe(question="Test?", mode=mode))
+        assert result["action"] == "depth_probe"
+        assert result["mode"] == mode
+        assert "prompt" in result
+    # meta needs prior
+    result = json.loads(await depth_probe(question="Test?", mode="meta", prior="prior data"))
+    assert result["action"] == "depth_probe"
+    assert result["mode"] == "meta"
+
+
+@pytest.mark.asyncio
+async def test_depth_probe_all_modes_accept_valid_result():
+    """All 5 modes accept valid result JSON on second call."""
+    sample = _sample_depth_result()
+    for mode in ("vanilla", "failure", "assumption", "stakeholder"):
+        result = json.loads(await depth_probe(question="Test?", mode=mode, result=sample))
+        assert result["probed"] is True
+        assert result["mode"] == mode
+    # meta needs prior
+    result = json.loads(await depth_probe(
+        question="Test?", mode="meta", prior="prior data", result=sample,
+    ))
+    assert result["probed"] is True
+    assert result["mode"] == "meta"
+
+
+@pytest.mark.asyncio
+async def test_depth_probe_prior_ignored_for_non_meta():
+    """prior parameter is ignored (not in prompt) for non-meta modes."""
+    result = json.loads(await depth_probe(
+        question="Test?",
+        mode="failure",
+        prior="This should not appear",
+    ))
+    assert "This should not appear" not in result["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_depth_probe_prior_dict_serialized():
+    """prior as dict is serialized with json.dumps before prompt injection."""
+    prior_dict = {"finding": "Too narrow", "confidence": 0.8}
+    result = json.loads(await depth_probe(
+        question="Test?",
+        mode="meta",
+        prior=prior_dict,
+    ))
+    assert "Too narrow" in result["prompt"]
+    assert "0.8" in result["prompt"]
+
+
+@pytest.mark.asyncio
+async def test_depth_probe_first_call_includes_mode_key():
+    """First-call response includes mode key (matching diverge pattern)."""
+    result = json.loads(await depth_probe(question="Test?", mode="assumption"))
+    assert "mode" in result
+    assert result["mode"] == "assumption"

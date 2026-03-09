@@ -257,3 +257,136 @@ Respond with JSON:
 }}
 
 This isn't about the answer. It's about whether your reasoning process is up to the task."""
+
+# JSON response schema shared by all depth probe modes
+_DEPTH_PROBE_JSON_SCHEMA = """Respond with JSON:
+{{
+  "reframing": "The real question underneath, or 'framing is correct' if it is",
+  "thinking_required": "The type of reasoning this actually needs",
+  "shallow_spots": "Where my analysis will be thin if I don't force depth",
+  "missing_dimensions": "Lenses I'm not applying",
+  "process_critique": "Where a master reasoner would intervene in my method"
+}}"""
+
+DEPTH_PROBE_PROMPTS = {
+    "vanilla": DEPTH_PROBE_PROMPT,
+
+    "failure": """STOP. Before you think, hunt for plausible wrong answers.
+
+QUESTION: {{question}}
+
+You're about to reason through this. First, map the failure landscape.
+
+---
+
+**WHAT ARE THE MOST PLAUSIBLE WRONG ANSWERS?**
+List the answers that FEEL right but aren't. What makes each seductive — what true thing does it build on before going wrong?
+
+**WHERE DOES EACH WRONG PATH DIVERGE FROM TRUTH?**
+For each plausible wrong answer: identify the exact moment the reasoning goes off track. What assumption slips in unnoticed?
+
+**WHICH WRONG ANSWER AM I MOST LIKELY TO GIVE?**
+Be honest. Which failure mode matches your default reasoning pattern? Why will you be drawn to it?
+
+**WHAT WOULD MAKE THE WRONG ANSWER CORRECT?**
+Under what conditions would each plausible wrong answer actually be right? This reveals hidden assumptions about the problem.
+
+**WHERE WOULD A MASTER REASONER INTERVENE?**
+If someone who thinks for a living watched my process, where would they stop me? Not disagree with my conclusion—critique my METHOD.
+
+---
+
+{json_schema}
+
+This isn't about the answer. It's about mapping failure modes before they happen.""".format(json_schema=_DEPTH_PROBE_JSON_SCHEMA),
+
+    "assumption": """STOP. Before you think, excavate the hidden premises.
+
+QUESTION: {{question}}
+
+You're about to reason through this. First, audit what the question silently assumes.
+
+---
+
+**WHAT UNSTATED ASSUMPTIONS DOES THIS QUESTION BAKE IN?**
+List every premise the question takes for granted. Include framings, scope limitations, and implied values. The question itself constrains the answer space — how?
+
+**WHICH ASSUMPTIONS ARE MOST LIKELY WRONG?**
+Rank by fragility. Which assumed premises would change the answer most dramatically if false?
+
+**WHAT WOULD CHANGE IF EACH ASSUMPTION WERE FALSE?**
+For each key assumption: what different question would you be answering? What different answer would be correct?
+
+**WHAT QUESTION SHOULD HAVE BEEN ASKED INSTEAD?**
+If you could rewrite the question without its hidden assumptions, what would it become? Is the rewritten question more honest?
+
+**WHERE WOULD A MASTER REASONER INTERVENE?**
+If someone who thinks for a living watched my process, where would they stop me? Not disagree with my conclusion—critique my METHOD.
+
+---
+
+{json_schema}
+
+This isn't about the answer. It's about whether the question deserves the answer you're about to give it.""".format(json_schema=_DEPTH_PROBE_JSON_SCHEMA),
+
+    "stakeholder": """STOP. Before you think, find the people who'd disagree.
+
+QUESTION: {{question}}
+
+You're about to reason through this. First, populate the room with missing perspectives.
+
+---
+
+**WHO WOULD DISAGREE WITH THE OBVIOUS ANSWER AND WHY WOULD THEY BE RIGHT?**
+Name specific stakeholders, roles, or perspectives that would challenge the consensus view. What do they see that the majority misses?
+
+**WHAT PERSPECTIVE AM I NOT SEEING?**
+Which viewpoint is structurally invisible from your position? Who has skin in the game that you're ignoring? Whose costs are you externalizing?
+
+**WHAT WOULD EACH DISSENTER PRIORITIZE?**
+For each missing perspective: what's their #1 concern? How does it reshape the problem?
+
+**WHERE IS THE OBVIOUS ANSWER ACTUALLY SOMEONE ELSE'S PROBLEM?**
+The "right" answer often just shifts costs. Who bears the cost of the obvious solution? Would they agree it's obvious?
+
+**WHERE WOULD A MASTER REASONER INTERVENE?**
+If someone who thinks for a living watched my process, where would they stop me? Not disagree with my conclusion—critique my METHOD.
+
+---
+
+{json_schema}
+
+This isn't about the answer. It's about whether your reasoning includes the people who'll live with the consequences.""".format(json_schema=_DEPTH_PROBE_JSON_SCHEMA),
+
+    "meta": """STOP. A previous probe already examined this question. Now examine what that probe missed.
+
+QUESTION: {{question}}
+
+PREVIOUS PROBE FINDINGS:
+{{prior}}
+
+The previous probe gave you a frame. Now break that frame.
+
+---
+
+**WHAT DID THAT FRAMING MISS?**
+Every frame is a window — it shows something and hides something. What's hidden by the previous probe's perspective?
+
+**WHAT'S INVISIBLE FROM THAT FRAME?**
+Not just "missing" — structurally invisible. What can't you see from the vantage point the previous probe established?
+
+**WHERE DID THE PREVIOUS PROBE GO SHALLOW?**
+Which of its findings feel complete but aren't? Where did it satisfy itself too easily?
+
+**WHAT WOULD A SECOND OPINION LOOK LIKE?**
+If you asked a completely different kind of thinker to probe this question, what would they focus on that the first probe didn't?
+
+**WHERE WOULD A MASTER REASONER INTERVENE?**
+If someone who thinks for a living watched the COMBINED probing process, where would they stop you? What's the meta-failure in your meta-cognition?
+
+---
+
+{json_schema}
+
+This isn't about the answer. It's about whether your second look is genuinely independent or just confirming the first.""".format(json_schema=_DEPTH_PROBE_JSON_SCHEMA),
+}
